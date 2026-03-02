@@ -27,7 +27,7 @@ import tempfile
 import threading
 from urllib.parse import urlparse
 
-from metaflow import FlowSpec, Parameter, conda, current, pypi, step
+from metaflow import FlowSpec, Parameter, conda, current, step
 
 from metaflow_coordinator import (
     CompletionTracker,
@@ -76,20 +76,33 @@ class PostgresResultsFlow(FlowSpec):
 
     # ── Coordinator ───────────────────────────────────────────────────────────
 
-    # @conda installs the postgres binary (initdb + postgres); @pypi installs psycopg2
-    @conda(packages={"postgresql": "16"})
-    @pypi(packages={"psycopg2-binary": "2.9"})
+    # @conda installs the postgres binary (initdb + postgres) and psycopg2
+    @conda(libraries={"postgresql": ">=16.1", "psycopg2": ">=2.9.9"})
     @step
     def run_coordinator(self):
+        import os
         import psycopg2
 
         coordinator_id = self.coordinator_id
         top_k          = self.top_k
 
-        # Initialise a fresh Postgres data directory (ephemeral; no persistent state)
+        # Initialise a fresh Postgres data directory (ephemeral; no persistent state).
+        # PostgreSQL refuses to run as root, so when root is detected we delegate
+        # initdb / postgres to the 'daemon' system user via runuser(1).
         data_dir = tempfile.mkdtemp(prefix=f"mf-pg-{coordinator_id}-")
+        is_root  = os.getuid() == 0
+        if is_root:
+            import grp, pwd
+            daemon_uid = pwd.getpwnam("daemon").pw_uid
+            daemon_gid = grp.getgrnam("daemon").gr_gid
+            os.chown(data_dir, daemon_uid, daemon_gid)
+            _wrap = ["runuser", "-u", "daemon", "--"]
+        else:
+            _wrap = []
+
         subprocess.run(
-            ["initdb", "-D", data_dir, "--auth", "trust", "--username", "postgres"],
+            _wrap + ["initdb", "-D", data_dir, "--auth", "trust", "--username", "postgres",
+                     "--locale=C"],
             check=True, capture_output=True,
         )
 
@@ -125,7 +138,7 @@ class PostgresResultsFlow(FlowSpec):
         threading.Thread(target=_query_then_stop, daemon=True).start()
 
         pg_svc = ProcessService(
-            command=[
+            command=_wrap + [
                 "postgres", "-D", data_dir, "-p", "{port}",
                 "-h", "0.0.0.0",
                 "-c", "log_min_messages=FATAL",
@@ -155,7 +168,7 @@ class PostgresResultsFlow(FlowSpec):
         self.tracker_url = urls["tracker"]
         self.next(self.run_worker, foreach="worker_ids")
 
-    @pypi(packages={"psycopg2-binary": "2.9"})
+    @conda(libraries={"psycopg2": ">=2.9.9"})
     @step
     def run_worker(self):
         import httpx

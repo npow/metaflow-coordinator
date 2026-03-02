@@ -4,7 +4,7 @@ location; worker tasks poll until it appears.
 
 Local mode  → /tmp/mf-svc-{namespace}-{service_id_safe}.json
 Remote mode → s3://{bucket}/{prefix}/{namespace}/{service_id}/endpoint
-              (detected via AWS_BATCH_JOB_ID or KUBERNETES_SERVICE_HOST)
+              (detected via AWS_BATCH_JOB_ID or METAFLOW_KUBERNETES_WORKLOAD)
 
 Checkpoint  → same path + "-checkpoint" suffix (local) or "/checkpoint" (S3)
 """
@@ -18,7 +18,7 @@ import time
 def _is_remote() -> bool:
     return bool(
         os.environ.get("AWS_BATCH_JOB_ID")
-        or os.environ.get("KUBERNETES_SERVICE_HOST")
+        or os.environ.get("METAFLOW_KUBERNETES_WORKLOAD")
     )
 
 

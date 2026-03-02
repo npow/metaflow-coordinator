@@ -68,8 +68,8 @@ class RedisCacheFlow(FlowSpec):
 
     # ── Coordinator ───────────────────────────────────────────────────────────
 
-    # @conda installs the redis-server binary
-    @conda(packages={"redis": "7.2"})
+    # @conda installs the redis-server binary (conda-forge package name is redis-server)
+    @conda(libraries={"redis-server": ">=7"})
     @step
     def run_coordinator(self):
         """Start redis-server and a completion tracker; block until workers finish."""

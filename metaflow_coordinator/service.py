@@ -146,7 +146,15 @@ class FastAPIService(SessionService):
         import uvicorn
         from .rendezvous import register_service
 
-        actual_port = _find_free_port(self._port or 8765)
+        # Bind to port 0 so the OS assigns a free port atomically.
+        # Keeping the socket open until uvicorn takes it over eliminates the
+        # TOCTOU race that occurs when multiple coordinator steps run in parallel
+        # on the same host and both call _find_free_port concurrently.
+        srv_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv_sock.bind(("0.0.0.0", self._port or 0))
+        actual_port = srv_sock.getsockname()[1]
+
         ip = _get_local_ip()
         url = f"http://{ip}:{actual_port}"
         self._url = url
@@ -155,13 +163,13 @@ class FastAPIService(SessionService):
 
         config = uvicorn.Config(
             self._app,
-            host="0.0.0.0",
-            port=actual_port,
             log_level="warning",
             access_log=False,
         )
         server = uvicorn.Server(config)
-        server_thread = threading.Thread(target=server.run, daemon=True)
+        server_thread = threading.Thread(
+            target=lambda: server.run(sockets=[srv_sock]), daemon=True
+        )
         server_thread.start()
 
         # Give uvicorn a moment to bind
