@@ -51,68 +51,108 @@ pip install metaflow-coordinator
 pip install "metaflow-coordinator[s3]"
 ```
 
-Define a coordinator step that runs a FastAPI service and a worker step that discovers and calls it:
+A coordinator step runs a service; worker steps discover and call it. Both run concurrently inside the same flow.
 
 ```python
-from metaflow_coordinator import CompletionTracker, FastAPIService, await_service
-
-# coordinator step — blocks until all workers call POST /complete, then tears down
-tracker = CompletionTracker(n_workers=4)
-app = FastAPI()
-
-@app.post("/submit")
-async def submit(body: dict):
-    results[body["worker_id"]] = body["value"]
-
-FastAPIService(app=app, done=tracker.done).run(
-    service_id=self.coordinator_id, namespace="my-flow"
+from metaflow import FlowSpec, current, step
+from metaflow_coordinator import (
+    CompletionTracker, FastAPIService, await_service,
+    coordinator_join, worker_join,
 )
+
+class MyFlow(FlowSpec):
+
+    @step
+    def start(self):
+        self.coordinator_id = current.run_id
+        self.worker_ids = list(range(4))
+        self.next(self.run_coordinator, self.launch_workers)
+
+    @step
+    def run_coordinator(self):
+        tracker = CompletionTracker(n_workers=4)
+        app = FastAPI()
+        results = {}
+
+        @app.post("/submit")
+        async def submit(body: dict):
+            results[body["worker_id"]] = body["value"]
+
+        FastAPIService(app=app, done=tracker.done).run(
+            service_id=self.coordinator_id, namespace="my-flow"
+        )
+        self.results = results
+        self.next(self.join)
+
+    @step
+    def launch_workers(self):
+        self.next(self.run_worker, foreach="worker_ids")
+
+    @step
+    def run_worker(self):
+        url = await_service(self.coordinator_id, namespace="my-flow", timeout=60)
+        httpx.post(f"{url}/submit", json={"worker_id": self.input, "value": 42})
+        httpx.post(f"{url}/complete")
+        self.next(self.join_workers)
+
+    @step
+    @worker_join
+    def join_workers(self, inputs):
+        self.next(self.join)
+
+    @step
+    @coordinator_join
+    def join(self, inputs):
+        self.next(self.end)
+
+    @step
+    def end(self):
+        print(self.results)
 ```
 
-```python
-# worker step — one line to discover the URL
-url = await_service(self.coordinator_id, namespace="my-flow", timeout=60)
-httpx.post(f"{url}/submit", json={"worker_id": self.input, "value": 42})
-httpx.post(f"{url}/complete")
-```
-
-See [`examples/echo_service.py`](examples/echo_service.py) for the complete runnable flow.
+See [`examples/echo_service.py`](examples/echo_service.py) for the full runnable version.
 
 ## Usage
 
 ### Work Queue
 
 ```python
-# coordinator — one line replaces custom FastAPI + queue logic
-wq = WorkQueue(items=my_records, drain_delay=2.0)
-wq.run(service_id=self.coordinator_id, namespace="my-flow")
-self.results = wq.results
-```
+@step
+def run_coordinator(self):
+    wq = WorkQueue(items=my_records, drain_delay=2.0)
+    wq.run(service_id=self.coordinator_id, namespace="my-flow")
+    self.results = wq.results
+    self.next(self.join)
 
-```python
-# worker
-while True:
-    item = httpx.post(f"{url}/pull", json={}).json()
-    if item["done"]:
-        break
-    httpx.post(f"{url}/submit", json={"item_id": item["item_id"], "result": process(item["payload"])})
+@step
+def run_worker(self):
+    url = await_service(self.coordinator_id, namespace="my-flow", timeout=60)
+    while True:
+        item = httpx.post(f"{url}/pull", json={}).json()
+        if item["done"]:
+            break
+        httpx.post(f"{url}/submit", json={"item_id": item["item_id"], "result": process(item["payload"])})
+    self.next(self.join_workers)
 ```
 
 ### Rate Limiter
 
 ```python
-# coordinator — caps concurrent API calls across the entire fleet
-SemaphoreService(max_concurrent=5, n_workers=self.n_workers).run(
-    service_id=self.coordinator_id, namespace="my-flow"
-)
-```
+@step
+def run_coordinator(self):
+    SemaphoreService(max_concurrent=5, n_workers=self.n_workers).run(
+        service_id=self.coordinator_id, namespace="my-flow"
+    )
+    self.next(self.join)
 
-```python
-# worker
-httpx.post(f"{url}/acquire")     # blocks until a slot is free
-result = call_rate_limited_api()
-httpx.post(f"{url}/release")
-httpx.post(f"{url}/done")
+@step
+def run_worker(self):
+    url = await_service(self.coordinator_id, namespace="my-flow", timeout=60)
+    httpx.post(f"{url}/acquire")     # blocks until a slot is free
+    result = call_rate_limited_api()
+    httpx.post(f"{url}/release")
+    httpx.post(f"{url}/done")
+    self.next(self.join_workers)
 ```
 
 ### External process (Redis, Postgres, nginx, DuckDB, …)
@@ -120,7 +160,7 @@ httpx.post(f"{url}/done")
 `ProcessService` wraps any binary. The `url_scheme` parameter controls the URL workers receive — `"redis"` gives `redis://host:port`, `"postgresql"` gives `postgresql://host:port`, etc. Workers connect with their native client.
 
 ```python
-# coordinator — @conda installs redis-server binary, @pypi installs the Python client
+# @conda installs the binary; @pypi installs the Python client
 @conda(packages={"redis": "7.2"})
 @pypi(packages={"redis": "5.0"})
 @step
@@ -134,20 +174,21 @@ def run_coordinator(self):
     SessionServiceGroup({"redis": redis_svc, "tracker": tracker}).run(
         service_id=self.coordinator_id, namespace="my-flow"
     )
-```
+    self.next(self.join)
 
-```python
-# worker step — also needs the Python client
 @pypi(packages={"redis": "5.0"})
 @step
 def run_worker(self):
     import redis
-    urls = discover_services(self.coordinator_id, roles=["redis", "tracker"], ...)
+    urls = discover_services(self.coordinator_id, roles=["redis", "tracker"],
+                             namespace="my-flow", timeout=120)
     r = redis.Redis.from_url(urls["redis"])
     r.set("key", "value")
+    httpx.post(f"{urls['tracker']}/complete")
+    self.next(self.join_workers)
 ```
 
-`shared_cache.py` shows Redis as a drop-in for the FastAPI shared cache — swap `FastAPIService` for `ProcessService(["redis-server", ...])` with no changes to worker logic beyond using `redis.Redis` instead of `httpx`. `shard_server.py` shows the same pattern for file serving, with nginx as an alternative to `python -m http.server`.
+See [`examples/redis_cache.py`](examples/redis_cache.py) and [`examples/postgres_results.py`](examples/postgres_results.py) for full working examples.
 
 ### Built-in services
 
@@ -213,21 +254,10 @@ def join_workers(self, inputs):
 
 ## Remote execution
 
-Add `@batch` or `@kubernetes` to coordinator and worker steps. Service URLs are exchanged via S3 automatically — no VPC changes needed as long as coordinator and workers share a VPC.
+Add `@batch` or `@kubernetes` to coordinator and worker steps. Service URLs are exchanged via S3 automatically — no VPC changes needed as long as coordinator and workers share a VPC. Install the S3 extra to enable this:
 
-For external processes that need native binaries, combine `@conda` (the binary) with `@pypi` (the Python client):
-
-```python
-@conda(packages={"redis": "7.2"})
-@pypi(packages={"redis": "5.0"})
-@step
-def run_coordinator(self):
-    tracker = CompletionTracker(n_workers=self.n_workers)
-    redis   = ProcessService(["redis-server", "--port", "{port}"],
-                              done=tracker.done, url_scheme="redis")
-    SessionServiceGroup({"redis": redis, "tracker": tracker}).run(
-        service_id=self.coordinator_id, namespace="my-flow"
-    )
+```bash
+pip install "metaflow-coordinator[s3]"
 ```
 
 ## Development
