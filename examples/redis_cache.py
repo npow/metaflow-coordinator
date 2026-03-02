@@ -90,7 +90,7 @@ class RedisCacheFlow(FlowSpec):
     def launch_workers(self):
         urls = discover_services(
             self.coordinator_id,
-            roles=["redis", "tracker"],
+            names=["redis", "tracker"],
             namespace="redis-cache",
             timeout=120,
         )

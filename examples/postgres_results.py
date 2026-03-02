@@ -101,7 +101,7 @@ class PostgresResultsFlow(FlowSpec):
             """After workers finish, run SQL aggregation, then shut down Postgres."""
             tracker.done.wait()
             urls   = discover_services(
-                coordinator_id, roles=["pg"], namespace="pg-results", timeout=10,
+                coordinator_id, names=["pg"], namespace="pg-results", timeout=10,
             )
             parsed = urlparse(urls["pg"])
             conn   = psycopg2.connect(
@@ -147,7 +147,7 @@ class PostgresResultsFlow(FlowSpec):
     def launch_workers(self):
         urls = discover_services(
             self.coordinator_id,
-            roles=["pg", "tracker"],
+            names=["pg", "tracker"],
             namespace="pg-results",
             timeout=120,
         )

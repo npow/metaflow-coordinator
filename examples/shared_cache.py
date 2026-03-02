@@ -166,7 +166,7 @@ class SharedFeatureStoreFlow(FlowSpec):
     def launch_workers(self):
         urls = discover_services(
             self.coordinator_id,
-            roles=["store", "tracker"],
+            names=["store", "tracker"],
             namespace="feature-store",
             timeout=120,
         )

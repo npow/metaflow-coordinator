@@ -58,22 +58,26 @@ def register_service(namespace: str, service_id: str, url: str) -> None:
 
 def discover_services(
     service_id: str,
-    roles: list[str],
+    names: list[str],
     namespace: str = "metaflow-svc",
     timeout: int = 120,
     poll_interval: float = 2.0,
 ) -> dict[str, str]:
     """
-    Discover multiple named services from a SessionServiceGroup concurrently.
+    Discover multiple services from a SessionServiceGroup concurrently.
 
-    Fetches all roles in parallel and returns a dict mapping role → URL.
-    Raises ServiceNotReadyError if any role times out.
+    ``names`` must match the keys passed to ``SessionServiceGroup``.
+    Fetches all URLs in parallel and returns a dict mapping name → URL.
+    Raises ServiceNotReadyError if any service times out.
 
     Example::
 
+        SessionServiceGroup({"echo": echo_svc, "tracker": tracker}).run(...)
+
+        # in the worker step:
         urls = discover_services(
             self.coordinator_id,
-            roles=["echo", "tracker"],
+            names=["echo", "tracker"],
             namespace="echo-example",
             timeout=120,
         )
@@ -82,21 +86,21 @@ def discover_services(
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    def fetch(role: str) -> tuple[str, str]:
+    def fetch(name: str) -> tuple[str, str]:
         url = await_service(
-            f"{service_id}/{role}",
+            f"{service_id}/{name}",
             namespace=namespace,
             timeout=timeout,
             poll_interval=poll_interval,
         )
-        return role, url
+        return name, url
 
-    with ThreadPoolExecutor(max_workers=len(roles)) as ex:
-        futures = {ex.submit(fetch, role): role for role in roles}
+    with ThreadPoolExecutor(max_workers=len(names)) as ex:
+        futures = {ex.submit(fetch, name): name for name in names}
         results: dict[str, str] = {}
         for fut in as_completed(futures):
-            role, url = fut.result()  # re-raises ServiceNotReadyError if any failed
-            results[role] = url
+            name, url = fut.result()  # re-raises ServiceNotReadyError if any failed
+            results[name] = url
 
     return results
 

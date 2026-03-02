@@ -74,7 +74,7 @@ class EchoServiceFlow(FlowSpec):
     def launch_workers(self):
         urls = discover_services(
             self.coordinator_id,
-            roles=["echo", "tracker"],
+            names=["echo", "tracker"],
             namespace="echo-example",
             timeout=120,
         )

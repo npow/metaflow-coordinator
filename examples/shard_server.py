@@ -201,7 +201,7 @@ class ShardServerFlow(FlowSpec):
     def launch_workers(self):
         urls = discover_services(
             self.coordinator_id,
-            roles=["files", "collector", "tracker"],
+            names=["files", "collector", "tracker"],
             namespace="shard-server",
             timeout=120,
         )

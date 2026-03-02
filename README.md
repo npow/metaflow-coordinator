@@ -179,7 +179,7 @@ def run_coordinator(self):
 @step
 def run_worker(self):
     import redis
-    urls = discover_services(self.coordinator_id, roles=["redis", "tracker"],
+    urls = discover_services(self.coordinator_id, names=["redis", "tracker"],
                              namespace="my-flow", timeout=120)
     r = redis.Redis.from_url(urls["redis"])
     r.set("key", "value")
@@ -226,12 +226,18 @@ SessionServiceGroup({"redis": redis_svc, "tracker": tracker}).run(
 
 ### Service discovery
 
-```python
-from metaflow_coordinator import await_service, discover_services
+Use `await_service` when the coordinator runs a single service, and `discover_services` when it runs a `SessionServiceGroup`. The `names` you pass must match the keys of the group dict.
 
-url  = await_service(self.coordinator_id, namespace="my-flow", timeout=120)
-urls = discover_services(self.coordinator_id, roles=["redis", "tracker"],
+```python
+# Single service (FastAPIService / ProcessService)
+url = await_service(self.coordinator_id, namespace="my-flow", timeout=120)
+
+# Multiple services — names must match SessionServiceGroup keys
+# coordinator: SessionServiceGroup({"redis": redis_svc, "tracker": tracker}).run(...)
+urls = discover_services(self.coordinator_id, names=["redis", "tracker"],
                          namespace="my-flow", timeout=120)
+urls["redis"]    # → redis://host:port
+urls["tracker"]  # → http://host:port
 ```
 
 ### Join decorators
