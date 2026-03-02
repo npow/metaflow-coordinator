@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metaflow-session-service"
+version = "0.1.0"
+description = "Ephemeral service coordination for Metaflow — run FastAPI or external processes inside steps"
+requires-python = ">=3.9"
+dependencies = [
+    "metaflow>=2.9",
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.23",
+    "httpx>=0.24",
+]
+
+[project.optional-dependencies]
+s3  = ["boto3>=1.20"]
+dev = ["pytest", "pytest-asyncio", "httpx"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["metaflow_session_service*"]
