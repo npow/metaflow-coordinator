@@ -37,6 +37,10 @@ from .service import (
     SocketReady,
 )
 
+# Tell Metaflow's code packager to include this package in the step zip,
+# so it is available in @pypi/@conda environments without a separate dependency.
+METAFLOW_PACKAGE_POLICY = "include"
+
 __all__ = [
     # Services
     "SessionService",
