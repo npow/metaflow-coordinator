@@ -32,7 +32,7 @@ import math
 import threading
 import time
 
-from metaflow import FlowSpec, Parameter, current, step
+from metaflow import FlowSpec, Parameter, current, pypi, step
 
 from metaflow_coordinator import FastAPIService, await_service, coordinator_join, worker_join, HTTPX_ERRORS
 
@@ -169,6 +169,7 @@ class TournamentFlow(FlowSpec):
         self.worker_indices = list(range(self.n_workers_int))
         self.next(self.run_worker, foreach="worker_indices")
 
+    @pypi(packages={"scikit-learn": "1.3"})
     @step
     def run_worker(self):
         """
@@ -237,6 +238,7 @@ class TournamentFlow(FlowSpec):
     def join(self, inputs):
         self.next(self.end)
 
+    @pypi(packages={"scikit-learn": "1.3"})
     @step
     def end(self):
         total_models = len(MODEL_CONFIGS)

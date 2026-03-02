@@ -47,7 +47,7 @@ Run:
 """
 import threading
 
-from metaflow import FlowSpec, current, step
+from metaflow import FlowSpec, current, pypi, step
 
 from metaflow_coordinator import FastAPIService, await_service, coordinator_join, worker_join
 
@@ -259,6 +259,7 @@ class NestedCoordinatorsFlow(FlowSpec):
         )
         self.next(self.run_group_worker, foreach="config_ids")
 
+    @pypi(packages={"scikit-learn": "1.3"})
     @step
     def run_group_worker(self):
         """Train and evaluate one hyperparameter config; report to group coordinator."""
