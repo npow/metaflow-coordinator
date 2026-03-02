@@ -4,11 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "metaflow-coordinator"
-version = "0.1.3"
+version = "0.1.4"
 description = "Give parallel Metaflow workers a shared service — work queues, rate limiters, barriers, Redis, Postgres — scoped to one run"
 requires-python = ">=3.9"
 dependencies = [
     "metaflow>=2.9",
+    "metaflow-netflixext>=1.0",
     "fastapi>=0.100",
     "uvicorn[standard]>=0.23",
     "httpx>=0.24",
@@ -20,4 +21,5 @@ dev = ["pytest", "pytest-asyncio", "httpx"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["metaflow_coordinator*"]
+include = ["metaflow_coordinator*", "metaflow_extensions*"]
+namespaces = true
