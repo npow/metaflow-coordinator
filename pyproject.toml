@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metaflow-coordinator"
+version = "0.1.0"
+description = "Give parallel Metaflow workers a shared service — work queues, rate limiters, barriers, Redis, Postgres — scoped to one run"
+requires-python = ">=3.9"
+dependencies = [
+    "metaflow>=2.9",
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.23",
+    "httpx>=0.24",
+]
+
+[project.optional-dependencies]
+s3  = ["boto3>=1.20"]
+dev = ["pytest", "pytest-asyncio", "httpx"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["metaflow_coordinator*"]
