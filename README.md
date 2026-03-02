@@ -26,22 +26,38 @@ When you fan out to N parallel worker steps, those workers share nothing. There'
 
 ## Coordination patterns
 
-Ten patterns cover the full range of worker↔coordinator interactions. Each has a runnable example in `examples/`.
+Each pattern has a runnable example in `examples/`.
 
-| # | Pattern | Use when… | Example |
-|---|---------|-----------|---------|
-| 1 | **Work Queue** | Tasks are heterogeneous; workers should self-assign the next available item | `work_queue.py` |
-| 2 | **Broadcast + Consensus** | Every worker gets the same input; you want majority vote or best-of-N | `agent_ensemble.py` |
-| 3 | **Shared Mutable State** | Workers have overlapping sub-problems; share a cache to skip redundant work | `shared_cache.py` |
-| 4 | **Synchronization Barrier** | Workers run in rounds and must wait for each other before continuing | `gradient_aggregator.py` |
-| 5 | **Adaptive Search** | Prune low-performing candidates between rounds (tournament / successive halving) | `tournament.py` |
-| 6 | **Rate Limiter** | Workers call a rate-limited API; enforce ≤ N concurrent requests across the fleet | `rate_limiter.py` |
-| 7 | **External Process** | Need Redis, nginx, DuckDB, or any binary — not just a Python service | `shard_server.py` |
-| 8 | **Priority Queue** | Tasks have priorities; high-priority work should jump the queue dynamically | `priority_queue.py` |
-| 9 | **Staged Pipeline** | Work flows through ordered stages; homogeneous workers handle any stage | `staged_pipeline.py` |
-| 10 | **Nested Coordinators** | Sub-groups of workers each need their own independent coordinator | `nested_coordinators.py` |
-| 11 | **Redis Cache** | Workers share an in-memory cache; avoid redundant computation across the fleet | `redis_cache.py` |
-| 12 | **Postgres Results** | Workers write to a shared table; coordinator queries top-k results via SQL | `postgres_results.py` |
+**Task distribution**
+
+| Pattern | Use when… | Example |
+|---------|-----------|---------|
+| **Work Queue** | Tasks are heterogeneous; workers self-assign the next available item | `work_queue.py` |
+| **Priority Queue** | Same, but high-priority items jump the queue as workers make discoveries | `priority_queue.py` |
+| **Staged Pipeline** | Work flows through ordered stages; any worker can handle any stage | `staged_pipeline.py` |
+
+**Throttling & synchronization**
+
+| Pattern | Use when… | Example |
+|---------|-----------|---------|
+| **Rate Limiter** | Workers call a rate-limited API; enforce ≤ N concurrent requests fleet-wide | `rate_limiter.py` |
+| **Synchronization Barrier** | Workers run in rounds and must all finish a round before the next begins | `gradient_aggregator.py` |
+
+**Shared state**
+
+| Pattern | Use when… | Example |
+|---------|-----------|---------|
+| **Shared Cache** | Workers have overlapping sub-problems; skip redundant work via a shared cache | `shared_cache.py` (in-process) · `redis_cache.py` (Redis) |
+| **Broadcast + Consensus** | Every worker sees the same input; aggregate with majority vote or best-of-N | `agent_ensemble.py` |
+| **Database Results** | Workers write structured results to a shared table; query with full SQL at the end | `postgres_results.py` |
+
+**Advanced**
+
+| Pattern | Use when… | Example |
+|---------|-----------|---------|
+| **Adaptive Search** | Prune weak candidates between rounds (successive halving / tournament) | `tournament.py` |
+| **External Process** | The coordinator needs to run a binary (Redis, nginx, DuckDB) instead of a Python service | `shard_server.py` |
+| **Nested Coordinators** | Sub-groups of workers each need their own independent coordinator | `nested_coordinators.py` |
 
 ## Quick start
 
