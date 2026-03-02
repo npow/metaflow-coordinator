@@ -160,9 +160,8 @@ def run_worker(self):
 `ProcessService` wraps any binary. The `url_scheme` parameter controls the URL workers receive — `"redis"` gives `redis://host:port`, `"postgresql"` gives `postgresql://host:port`, etc. Workers connect with their native client.
 
 ```python
-# @conda installs the binary; @pypi installs the Python client
+# @conda installs the redis-server binary
 @conda(packages={"redis": "7.2"})
-@pypi(packages={"redis": "5.0"})
 @step
 def run_coordinator(self):
     tracker   = CompletionTracker(n_workers=self.n_workers)
