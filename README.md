@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/npow/metaflow-coordinator/actions/workflows/ci.yml/badge.svg)](https://github.com/npow/metaflow-coordinator/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/metaflow-coordinator)](https://pypi.org/project/metaflow-coordinator/) [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE) [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-Give your parallel Metaflow workers a shared service — work queues, rate limiters, barriers, Redis, Postgres, custom APIs — that runs inside the flow and tears down when the run ends.
+Coordinate shared services across your parallel Metaflow workers — work queues, rate limiters, barriers, Redis, Postgres, custom APIs — scoped to one run.
 
 ## How it works
 
