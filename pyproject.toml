@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "metaflow-coordinator"
-version = "0.1.0"
+version = "0.1.1"
 description = "Give parallel Metaflow workers a shared service — work queues, rate limiters, barriers, Redis, Postgres — scoped to one run"
 requires-python = ">=3.9"
 dependencies = [
