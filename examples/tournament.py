@@ -169,7 +169,7 @@ class TournamentFlow(FlowSpec):
         self.worker_indices = list(range(self.n_workers_int))
         self.next(self.run_worker, foreach="worker_indices")
 
-    @pypi(packages={"scikit-learn": "1.3"})
+    @pypi(packages={"scikit-learn": ">=1.4"})
     @step
     def run_worker(self):
         """
@@ -238,7 +238,7 @@ class TournamentFlow(FlowSpec):
     def join(self, inputs):
         self.next(self.end)
 
-    @pypi(packages={"scikit-learn": "1.3"})
+    @pypi(packages={"scikit-learn": ">=1.4"})
     @step
     def end(self):
         total_models = len(MODEL_CONFIGS)

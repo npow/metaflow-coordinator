@@ -259,7 +259,7 @@ class NestedCoordinatorsFlow(FlowSpec):
         )
         self.next(self.run_group_worker, foreach="config_ids")
 
-    @pypi(packages={"scikit-learn": "1.3"})
+    @pypi(packages={"scikit-learn": ">=1.4"})
     @step
     def run_group_worker(self):
         """Train and evaluate one hyperparameter config; report to group coordinator."""
