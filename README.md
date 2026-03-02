@@ -54,9 +54,10 @@ pip install "metaflow-coordinator[s3]"
 A coordinator step runs a service; worker steps discover and call it. Both run concurrently inside the same flow.
 
 ```python
+import httpx
 from metaflow import FlowSpec, current, step
 from metaflow_coordinator import (
-    CompletionTracker, FastAPIService, await_service,
+    ResultCollector, await_service,
     coordinator_join, worker_join,
 )
 
@@ -70,18 +71,9 @@ class MyFlow(FlowSpec):
 
     @step
     def run_coordinator(self):
-        tracker = CompletionTracker(n_workers=4)
-        app = FastAPI()
-        results = {}
-
-        @app.post("/submit")
-        async def submit(body: dict):
-            results[body["worker_id"]] = body["value"]
-
-        FastAPIService(app=app, done=tracker.done).run(
-            service_id=self.coordinator_id, namespace="my-flow"
-        )
-        self.results = results
+        collector = ResultCollector(n_workers=4)
+        collector.run(service_id=self.coordinator_id, namespace="my-flow")
+        self.results = collector.results_by_worker   # {worker_id: value}
         self.next(self.join)
 
     @step
@@ -91,8 +83,7 @@ class MyFlow(FlowSpec):
     @step
     def run_worker(self):
         url = await_service(self.coordinator_id, namespace="my-flow", timeout=60)
-        httpx.post(f"{url}/submit", json={"worker_id": self.input, "value": 42})
-        httpx.post(f"{url}/complete")
+        httpx.post(f"{url}/submit", json={"worker_id": self.input, "result": self.input * 2})
         self.next(self.join_workers)
 
     @step
@@ -110,7 +101,9 @@ class MyFlow(FlowSpec):
         print(self.results)
 ```
 
-See [`examples/echo_service.py`](examples/echo_service.py) for the full runnable version.
+`ResultCollector.run()` blocks until all 4 workers post to `POST /submit`, then tears down. No threads, no custom FastAPI app, no `/complete` calls needed.
+
+See [`examples/echo_service.py`](examples/echo_service.py) for a full runnable version.
 
 ## Usage
 
